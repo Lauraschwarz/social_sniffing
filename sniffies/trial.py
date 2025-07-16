@@ -4,26 +4,14 @@ import pathlib
 import numpy as np
 import matplotlib.pyplot as plt
 import pims
-from looming_spots.analyse.escape_classification import is_track_a_freeze
-from looming_spots.analyse.track_functions import get_most_recent_loom
-from looming_spots.db.track import Track
-from looming_spots.util.generic_functions import pad_track
 
+from constants import ARENA, TRIAL_LENGTH
 from matplotlib import patches
 from datetime import timedelta
-from sniffies import Sniff
-from looming_spots.constants import (
-    LOOMING_STIMULUS_ONSET,
-    N_LOOMS_PER_STIMULUS,
-    N_SAMPLES_BEFORE,
-    ARENA_LENGTH_PX,
-    ARENA_WIDTH_PX,
-    ARENA_SIZE_CM,
-    FRAME_RATE,
-    TRACK_LENGTH,
-)
+import Sniff
+import Track
+import harp as hp
 
-from looming_spots.util import plotting
 import pandas as pd
 
 
@@ -46,38 +34,40 @@ class Trial(object):
     def __init__(
         self,
         session,
-        directory,
-        sample_number,
+        session_path,
+        onset,
+        trial_end, 
         stimulus_type,
       
     ):
         self.session = session
-        self.frame_rate = self.session.frame_rate
-        self.onset = sample_number
+        self.frame_rate = 50
+        self.onset = onset
         self.mouse_id = self.session.mouse_id
         self.stimulus_type = stimulus_type
-        self.directory = directory
+        self.directory = session_path
       
-        self.video_path = pathlib.Path(self.directory / "Video")
-        self.folder = pathlib.Path(self.directory / "output_inference")
-
+        self.video_path = pathlib.Path(f"{self.directory} / Video")
+        self.folder = pathlib.Path(f"{self.directory}/ output_inference")
+        self.rawdata_path = session_path.replace("derivatives", "rawdata")
         self.time_to_first_reward = None
 
 
-        self.trial_type = trial_type
         self.next_trial = None
         self.previous_trial = None
 
-        self.start = self.sample_number
-        self.end = self.next_trial.sample_number if self.next_trial is not None else max(self.sniffing.analogdata.index) #double chech this so it works
+        self.start = onset
+        fpaths = pathlib.Path(self.rawdata_path)
         
+        self.end = trial_end
+        #  so check if it is a datetime object and convert it to a sample number
 
  
-    def __gt__(self, other):
-        return self.time > other.time
+    # def __gt__(self, other):
+    #     return self.time > other.time
 
-    def __eq__(self, other):
-        return self.time == other.time
+    # def __eq__(self, other):
+    #     return self.time == other.time
 
     def __add__(self, a):
         if not isinstance(a, int):
@@ -94,115 +84,64 @@ class Trial(object):
     def set_previous_trial(cls, self, other):
         setattr(self, "previous_trial", other)
 
-    
     @property
     def track(self):
-        return Track(
-            self.folder,
-            self.session.path,
+        return Track.Track(
+            self.directory,
             self.start,
             self.end,
             self.frame_rate,
         )
-    
     @property
     def sniffing(self):
-        return Sniff(self.folder, 
-        self.session.path,
-        self.start,
-        self.end, self.frame_rate)
+        return Sniff.harp_data(session_directory=self.directory, mouseID=self.mouse_id,
+        start=self.start, end=self.end, frame_rate=self.frame_rate) 
+   
+   
 
+    
+    # @property
+    # def time(self):
+    #     return self.session.dt + timedelta(0, int(self.sample_number / self.frame_rate))
 
-    @property
-    def loom_number(self):
-        if self.sample_number in self.session.looming_stimuli_idx:
-            return int(
-                np.where(self.session.looming_stimuli_idx == self.sample_number)[0][0]
-                / N_LOOMS_PER_STIMULUS
-            )
+    # def plot_stimulus(self):
+    #     ax = plt.gca()
+    #     if self.stimulus_type == "auditory":
+    #         plotting.plot_auditory_stimulus(self.n_samples_before)
+    #     else:
+    #         plotting.plot_looms_ax(ax)
 
-    @property
-    def auditory_number(self):
-        if self.sample_number in self.session.auditory_stimuli_idx:
-            return int(
-                np.where(self.session.auditory_stimuli_idx == self.sample_number)[0][0]
-            )
+    # def to_df(self, group_id, extra_data=None):
+    #     n_points = TRACK_LENGTH
+    #     track = pad_track(
+    #         ARENA_SIZE_CM * self.track.normalised_x_track[0:n_points], n_points
+    #     )
+    #     unsmoothed_speed = pad_track(
+    #         FRAME_RATE * ARENA_SIZE_CM * self.track.normalised_x_speed[0:n_points],
+    #         n_points,
+    #     )
+    #     smoothed_speed = pad_track(
+    #         FRAME_RATE * ARENA_SIZE_CM * self.track.smoothed_x_speed[0:n_points],
+    #         n_points,
+    #     )
+    #     add_dict = {
+    #         "group_id": group_id,
+    #         "mouse_id": self.mouse_id,
+    #         "track": [track],
+    #         "speed": [smoothed_speed],
+    #         "peak_speed": self.track.peak_speed(),
+    #         "is_flee": self.track.is_escape(),
+    #         "latency": self.track.latency(),
+    #         "last_loom": get_most_recent_loom(self.track.latency()),
+    #         "is_freeze": is_track_a_freeze(unsmoothed_speed),
+    #         "time_to_shelter": self.track.time_to_shelter(),
+    #     }
 
-    def get_stimulus_number(self):
-        return self.stimulus_number()
+    #     if extra_data is not None:
+    #         for k, v in extra_data.items():
+    #             add_dict.setdefault(k, v)
 
-    @property
-    def time(self):
-        return self.session.dt + timedelta(0, int(self.sample_number / self.frame_rate))
+    #     this_trial_df = pd.DataFrame.from_dict(add_dict)
+    #     return this_trial_df
 
-    def plot_stimulus(self):
-        ax = plt.gca()
-        if self.stimulus_type == "auditory":
-            plotting.plot_auditory_stimulus(self.n_samples_before)
-        else:
-            plotting.plot_looms_ax(ax)
-
-    def to_df(self, group_id, extra_data=None):
-        n_points = TRACK_LENGTH
-        track = pad_track(
-            ARENA_SIZE_CM * self.track.normalised_x_track[0:n_points], n_points
-        )
-        unsmoothed_speed = pad_track(
-            FRAME_RATE * ARENA_SIZE_CM * self.track.normalised_x_speed[0:n_points],
-            n_points,
-        )
-        smoothed_speed = pad_track(
-            FRAME_RATE * ARENA_SIZE_CM * self.track.smoothed_x_speed[0:n_points],
-            n_points,
-        )
-        add_dict = {
-            "group_id": group_id,
-            "mouse_id": self.mouse_id,
-            "track": [track],
-            "speed": [smoothed_speed],
-            "peak_speed": self.track.peak_speed(),
-            "is_flee": self.track.is_escape(),
-            "latency": self.track.latency(),
-            "last_loom": get_most_recent_loom(self.track.latency()),
-            "is_freeze": is_track_a_freeze(unsmoothed_speed),
-            "time_to_shelter": self.track.time_to_shelter(),
-        }
-
-        if extra_data is not None:
-            for k, v in extra_data.items():
-                add_dict.setdefault(k, v)
-
-        this_trial_df = pd.DataFrame.from_dict(add_dict)
-        return this_trial_df
-
-
-class VisualStimulusTrial(LoomTrial):
-    def __init__(
-        self,
-        session,
-        directory,
-        sample_number,
-        trial_type,
-        stimulus_type="loom",
-    ):
-        super().__init__(
-            session,
-            directory,
-            sample_number,
-            trial_type,
-            stimulus_type,
-            trial_video_fname="{}{}.mp4",
-        )
-
-
-class AuditoryStimulusTrial(LoomTrial):
-    def __init__(
-        self,
-        session,
-        directory,
-        sample_number,
-        trial_type,
-        stimulus_type="auditory",
-    ):
-        super().__init__(session, directory, sample_number, trial_type, stimulus_type)
 

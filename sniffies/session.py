@@ -4,15 +4,21 @@ import warnings
 from pathlib import Path
 from shutil import copyfile
 
-import looming_spots.loom_io.load
 import numpy as np
 from datetime import datetime
 
 from cached_property import cached_property
 
-import harp_python as hp
-from sniffies import Sniff, Track, trial
+import harp as hp
+import Sniff
+import trial
+import Track
+import photometry
+from global_functions import get_harp_paths, join_binary_files
+
+
 PROCESSED_DATA_DIRECTORY = r"F:\social_sniffing\derivatives"
+from constants import ARENA
 class Session(object):
 
     """
@@ -29,12 +35,12 @@ class Session(object):
         
     ):
         self.mouse_id = mouse_id
-        self.n_trials_to_exclude = n_trials_to_exclude
         self.next_session = None
         self.previous_session = None
         self.session_path = session_path
         self.rawdata_path = session_path.replace("derivatives", "rawdata")
-        self.dt = session_path.name
+        self.path = pathlib.Path(session_path)
+        self.trials = self.trials()
 
     def __len__(self):
         return len(self.data["photodiode"])
@@ -63,18 +69,29 @@ class Session(object):
 
    
 
-    @cached_property
+    
     def trials(self):
-        trials_idx = self.get_trial_onsets()
+        trial_onsets_path = pathlib.Path(self.session_path) / "trial_onsets.npy"
+        trial_ends_path = pathlib.Path(self.session_path) / "trial_ends.npy"
+
+        if trial_onsets_path.exists() and trial_ends_path.exists():
+            # Load from file if both exist
+            trial_onsets = np.load(trial_onsets_path, allow_pickle=True)
+            trial_ends = np.load(trial_ends_path, allow_pickle=True)
+            
+        else:
+            # Otherwise, generate them
+            trial_onsets, trial_ends = self.get_trial_onsets()        
 
         trials = self.initialise_trials(
-            trials_idx, 
+            onsets=trial_onsets,
+            trial_ends=trial_ends,
             stimulus_type="conspecific"
         )
 
-        return sorted(trials)
+        return trials
     
-    @cached_property
+    
     def get_trial_onsets(self):
         """
         Returns the trial onsets for the session. 
@@ -84,93 +101,77 @@ class Session(object):
         if it isnt it will crash.
         :return:
         """
-        output_set = hp.create_reader(directory=self.directory, epoch=hp.REFERENCE_EPOCH)
-        read_path = [path for path in (session_dir.rglob("*34_*.bin") )]
-        output_set = output_set.OutputSet.read(read_path
-        )
-        port0 = output_set["DIOport0"]
-        trial_onsets = port0[port0 == True].index
-        
-        return trial_onsets
+        reader = hp.create_reader(r'F:/social_sniffing', epoch=hp.REFERENCE_EPOCH)
+
+        output_set = reader.OutputSet.read(get_harp_paths(pathlib.Path(self.rawdata_path) / 'behav', register='34'))
+        port0 = output_set["DOPort0"]
+        trial_onsets = (port0[port0 == True].index)
+        analog = reader.AnalogData.read(get_harp_paths(pathlib.Path(self.rawdata_path) / 'behav', register='44'))
+        analog_timestamps = (analog['AnalogInput0'].index)
+        end = []
+        for i, onset in enumerate(analog_timestamps):
+            start = onset
+            if i < len(trial_onsets) - 1:
+                next_start = trial_onsets[i + 1]
+                idx = np.argmin(np.abs(analog_timestamps - next_start))
+                nearest_timestamp = analog_timestamps[idx]
+                end.append(nearest_timestamp)
+        else:
+            end.append(analog_timestamps[-1])
+        #save to .npy
+        trial_onsets = np.array(trial_onsets)
+        end = np.array(end)
+        save_dir = pathlib.Path(self.session_path)
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        np.save(pathlib.Path(save_dir, "trial_onsets.npy"), trial_onsets)
+        np.save(pathlib.Path(save_dir, "trial_ends.npy"), end)
+        return trial_onsets, end
 
 
-    def initialise_trials(self, idx, stimulus_type):
-        if idx is not None:
-            if len(idx) > 0:
+
+    def initialise_trials(self, onsets, trial_ends, stimulus_type="conspecific"):
+        if onsets is not None:
+            if len(onsets) > 0:
                 trials = []
-                for i, onset in enumerate(idx):
+                for i, onset in enumerate(onsets):
                     t = trial.Trial(
                             self,
-                            directory=self.session_path,
-                            sample_number=onset,
+                            session_path=self.session_path,
+                            onset=onset,
+                            trial_end=trial_ends[i],
                             stimulus_type="conspecific",
                         )
                     
                     trials.append(t)
+                # Set next_trial and previous_trial links
+                for i in range(len(trials) - 1):
+                    trial.Trial.set_next_trial(trials[i], trials[i + 1])
+                    trial.Trial.set_previous_trial(trials[i + 1], trials[i])
                 return trials
         else:
             return ValueError("No trials found")
    
-
-    def get_trial_type(self, sample_number):
+    def photometry(self):
         """
-        Returns the trial type of the trial at the given sample number.
-
-        :param sample_number:
-        :return:
+        Returns the photometry data for the session.
+        :return: A DataFrame with the photometry data.
         """
-   
-
-    def get_trials_of_protocol_type(self, key):
-        """
-        Returns trials grouped as either belonging to an LSE protocol, or being a testing trial of some sort
-        to later be more specifically classified as a pre- or post- lse testing trial.
-
-        :param key:
-        :return:
-        """
-        if key == "conspecific":
-            return [t for t in self.trials if "conspecific" in t.trial_type]
-
-        return [t for t in self.trials if t.trial_type == key]
-
-  
-    @cached_property
-    def looming_stimuli_idx(self):
-        loom_idx_path = os.path.join(self.path, "loom_starts.npy")
-        if not os.path.isfile(loom_idx_path):
-            _ = photodiode.get_loom_idx_from_photodiode_trace(self.path, save=True)[0]
+        path = self.rawdata_path / "photo"
 
 
-    def get_data(self, key):
-        data_func_dict = {
-            "x_pos": self.x_pos,
-            "y_pos": self.y_pos,
-            "trials": self.get_session_trials,
-        }
-
-        return data_func_dict[key]
-
-
-    def track(self):
-        return track_functions.track_in_standard_space(
-            self.path, get_tracking_method(self.path), 0, len(self), None
-        )
+    
 
     def x_pos(self):
         return self.track()[0]
 
     def y_pos(self):
         return self.track()[1]
-
-    @classmethod
-    def set_next_session(cls, self, other):
-        setattr(self, "next_session", other)
-
-    @classmethod
-    def set_previous_session(cls, self, other):
-        setattr(self, "previous_session", other)
-
+    
+    @property
+    def photometry(self):
+        return photometry.photo(session_directory=self.rawdata_path, mouseID=self.mouse_id,
+        frame_rate=50)
 
 def load_sessions(mouse_id):
     mouse_directory = pathlib.Path(PROCCESSED_DATA_DIRECTORY / mouse_id)
@@ -213,37 +214,3 @@ def load_sessions(mouse_id):
     raise MouseNotFoundError()
 
 
-def contains_analog_input(file_names):
-    if "AI.bin" in file_names or "AI.tdms" in file_names:
-        return True
-    return False
-
-
-def contains_video(file_names):
-    return any(".avi" in fname for fname in file_names) or any(
-        ".mp4" in fname for fname in file_names
-    )
-
-
-def contains_tracks(session_directory):
-    p = pathlib.Path(session_directory)
-    if len(list(p.rglob("*.h5"))) == 0:
-        return False
-    else:
-        return True
-
-
-def get_tracks_from_raw(directory):
-    print(f"getting tracks from {directory}")
-    p = Path(directory)
-    track_paths = p.rglob("*tracks.npy")
-    if len(list(p.rglob("*tracks.npy"))) == 0:
-        print("no track paths found...")
-        return False
-
-    for tp in track_paths:
-        raw_path = str(tp)
-        processed_path = raw_path.replace("rawdata", "derivatives")
-        print(f"copying {raw_path} to {processed_path}")
-        copyfile(raw_path, processed_path)
-    return True

@@ -3,7 +3,6 @@ import warnings
 from cached_property import cached_property
 from pathlib import Path
 
-from xpmtd import spikeglx_metadata_reader
 
 
 class MouseMetadata:

@@ -28,12 +28,9 @@ def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size)/window_size, mode='same', )
 
 reader = hp.create_reader(r'F:\harp', epoch=hp.REFERENCE_EPOCH)
-analog = reader.AnalogData.read(r'Y:\Laura\harp\testing\2025-04-29T14-18-49\behav\behav_testing_44_1904-01-30T00-00-00.bin')
+analog = reader.AnalogData.read(r'Y:\Laura\harp\testing\2025-04-29T12-49-54\behav\behav_testing_44_1904-01-29T22-00-00.bin')
 
-poke = reader.DigitalInputState.read(r'Y:\Laura\harp\testing\2025-04-29T14-18-49\behav\behav_testing_32_1904-01-30T00-00-00.bin')
-valve = reader.OutputSet.read(r'Y:\Laura\harp\testing\2025-04-29T14-18-49\behav\behav_testing_34_1904-01-30T00-00-00.bin')
-camera = reader.Camera0Frame.read(r'Y:\Laura\harp\testing\2025-04-29T14-18-49\behav\behav_testing_92_1904-01-30T00-00-00.bin')
-# Define the time range for the subset
+
 subset = analog.between_time("00:03:44", "00:06:50")
 
 
@@ -70,7 +67,7 @@ convert_array = pd.Series(filtered_peak_frequencies)
 smoothed_peak_frequencies = convert_array.ewm(span=5).mean()
 time_for_Hz = subtract_smooth[peaks][1::]
 plt.figure(figsize=(10, 6))
-plt.plot(smoothed_peak_frequencies, color='r', marker='o', markersize=1, linewidth=0.5)
+plt.plot(analog_input, color='r', marker='o', markersize=1, linewidth=0.5)
 plt.show()
 
 port_0 = poke["DIPort0"]

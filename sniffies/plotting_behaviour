@@ -1,0 +1,150 @@
+import matplotlib.pyplot as plt 
+import ultraplot as uplt
+import pims 
+import numpy as np 
+import pandas as pd
+import session 
+import movement.plots as plots
+import pathlib
+from matplotlib.collections import LineCollection
+import matplotlib.dates as mdates
+
+session = session.Session(
+    mouse_id='1125131',
+    session_path=r'F:\social_sniffing\derivatives\1125131\2025-07-01T12-47-28')
+trial = session.trials
+photo = session.photometry
+deltaF = photo.align_to_behav_time()
+signal, background = photo.clip_photometry()
+#video_start = trial[0].track.timestamps[0]
+num_trials = len(trial)
+
+def plot_sniff_deltaF(sniff_resampled, delta_f_resampled):
+    sniff_resampled, delta_f_resampled = sniff_resampled.align(delta_f_resampled, join='inner')
+
+    x = pd.to_datetime(sniff_resampled.index)
+    y = sniff_resampled.values
+    c = delta_f_resampled.values
+
+    # Convert datetime index to matplotlib float format
+    x_float = mdates.date2num(x)
+
+    points = np.array([x_float, y]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+    lc = LineCollection(segments, cmap='viridis', norm=plt.Normalize(c.min(), c.max()))
+    lc.set_array(c)
+    lc.set_linewidth(2)
+
+    fig, ax = plt.subplots(figsize=(10, 3))
+    ax.add_collection(lc)
+    ax.set_xlim(x_float.min(), x_float.max())
+    ax.set_ylim(y.min(), y.max())
+    ax.xaxis_date()  # Use datetime axis
+    ax.set_ylabel('Sniff Frequency')
+    ax.set_title('Sniff Frequency timeseries colored by deltaF')
+    plt.xlabel('Time')
+    plt.colorbar(lc, ax=ax, label='deltaF')
+    plt.tight_layout()
+    plt.savefig(pathlib.Path(session.session_path) / 'plots' / f'trial_{i+1}_sniff_deltaF_plot.png')
+
+    return
+def distance_color_delta_F(distance, delta_f):
+    distance_series = pd.Series(distance.values, index=t.track.timestamps[track.start_idx:track.end_idx])
+    distance_series = distance_series[~distance_series.index.duplicated(keep='first')]
+
+    distance_series = distance_series.interpolate(method='time')
+    common_time = pd.date_range(start=distance_series.index.min(), end=distance_series.index.max(), freq='100ms')
+
+    distance = distance_series.reindex(common_time, method='nearest')
+    delta_f_resampled = delta_f.reindex(common_time, method='nearest')
+
+
+    x = pd.to_datetime(distance.index)
+    y = distance.values
+    c = delta_f_resampled.values
+   
+
+    # Convert datetime index to matplotlib float format
+    x_float = mdates.date2num(x)
+
+    points = np.array([x_float, y]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+    lc = LineCollection(segments, cmap='viridis', norm=plt.Normalize(c.min(), c.max()))
+    lc.set_array(c)
+    lc.set_linewidth(2)
+
+    ax.add_collection(lc)
+    ax.set_xlim(x_float.min(), x_float.max())
+    ax.set_ylim(0, 600)
+    ax.xaxis_date()  # Use datetime axis
+    ax.set_ylabel('Distance (px)')
+    ax.set_title('Distance colored by deltaF')
+    plt.xlabel('Time')
+    plt.colorbar(lc, ax=ax, label='deltaF')
+    plt.tight_layout()
+    plt.savefig(pathlib.Path(session.session_path) / 'plots' / f'trial_{i+1}_position_deltaF.png')
+
+    
+
+def plot_distance_deltaF(i, t, snout_distance, delta_f, valve0, valve1):
+    fig, ax = plt.subplots(figsize=(10, 3))
+    
+
+    ax2 = ax.twinx()
+    ax.plot(t.track.timestamps[track.start_idx:track.end_idx], port0_distance, color='tab:green', label='Distanceport0')
+    ax.plot(t.track.timestamps[track.start_idx:track.end_idx], port1_distance, color='tab:red', label='Distanceport1')
+    #ax.plot(t.track.timestamps[track.start_idx:track.end_idx], snout_distance, color='tab:blue', label='DistanceSnout')
+    ax2.plot(delta_f, color='tab:gray', label='deltaF')
+    #ax.vlines(poke0, ymin = 0, ymax=500, color='tab:green', label='Poke Port 0', linestyle='--')
+    #ax.vlines(poke1, ymin = 0, ymax=500, color='tab:red', label='Poke Port 1', linestyle='--')
+    ax.vlines(valve0, ymin = 0, ymax=500, color='tab:olive', label='Valve Port 0', linestyle=':')
+    ax.vlines(valve1, ymin = 0, ymax=500, color='tab:purple', label='Valve Port 1', linestyle=':')
+    ax2.set_ylabel('Delta F')
+    ax.set_ylabel('distance (px)')
+    ax.set_title(f'Trial {i+1}')
+    ax.legend(loc='lower right')
+    ax2.legend(loc='upper right')
+    plt.xlabel('Time (s)')
+    plt.tight_layout()
+    plt.savefig(pathlib.Path(session.session_path) / 'plots' / f'trial_{i+1}_sniff_plot.png')
+    return
+
+for i, t in enumerate(trial):
+    fig, ax = plt.subplots(figsize=(10, 3))
+    start_time = pd.Timestamp(t.start).time()
+    end_time = t.end.time()
+    delta_f = deltaF.between_time(start_time, end_time)
+
+    sniff = t.sniffing.extract_sniff_freq()
+    common_time = pd.date_range(start=sniff.index.min(), end=sniff.index.max(), freq='100ms')
+
+    sniff_resampled = sniff.reindex(common_time, method='nearest')
+    delta_f_resampled = delta_f.reindex(common_time, method='nearest')
+    
+    raw_sniff = t.sniffing.analog 
+    poke0 = t.sniffing.get_pokes('DIPort0')
+    poke1 = t.sniffing.get_pokes('DIPort1')
+    valve0 = t.sniffing.get_valve_open('SupplyPort0')
+    valve1 = t.sniffing.get_valve_open('SupplyPort1')
+
+    #plot_sniff_deltaF(sniff_resampled, delta_f_resampled)
+
+
+    track = t.track
+    frame_datetimes = t.start + pd.to_timedelta(track.ds.time, unit='s')
+    sniff_aligned = sniff.reindex(frame_datetimes, method='nearest')
+    track.ds = track.ds.assign_coords(sniff=sniff_aligned.values)
+    distance = track.individual_distances()
+    snout_distance = distance.sel(**{'1': 'abdomen', '2': 'abdomen'})
+    port0_distance, port1_distance = track.distance_to_port(track.ds.position)
+    port0_distance = port0_distance.sel(individuals='2', keypoints='abdomen')
+    port1_distance = port1_distance.sel(individuals='2', keypoints='abdomen')
+    distance_from_wall = track.isin_ROI(track.ds.position)
+    distance_from_wall = distance_from_wall.sel(individuals='2', keypoints='abdomen')
+    abdomen_position = track.ds.position.sel(individuals='2', keypoints='abdomen')
+    distance_color_delta_F(abdomen_position, delta_f)
+
+    #plot_distance_deltaF(i, t, snout_distance, delta_f, valve0, valve1)
+

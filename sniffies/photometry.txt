@@ -1,0 +1,45 @@
+import numpy as np
+import pandas as pd
+import harp as hp
+import constants
+import pathlib
+from scipy.signal import find_peaks, savgol_filter, butter, sosfilt, sosfiltfilt
+import matplotlib.pyplot as plt
+
+
+class photometry(object):
+
+    def __init__(
+        self,
+        session_directory, 
+        mouseID,
+        frame_rate, 
+        module='photo'):
+
+        self.session_path = session_directory
+        self.module = module        
+        self.rawdata_path = self.session_path.replace("derivatives", "rawdata")
+     
+
+        self.trigger = self.get_photometry_trigger()
+        
+
+
+    def get_photometry_trigger(self):
+        reader = hp.create_reader(constants.OUTPUT_EXPANDER, epoch=hp.REFERENCE_EPOCH)
+        fpath = pathlib.Path(self.rawdata_path / 'OutputExpander')
+        read_path = get_harp_paths(fpath, '35')
+        if not read_path:
+            raise FileNotFoundError("Outputexpander file not found.")
+        output_expander_set = reader.OutputSet.read(read_path)
+        return output_expander_set['OutputExpander0']
+        
+
+
+
+
+
+def get_harp_paths(path, register):
+            fpaths = pathlib.Path(path)
+            read_path = [path for path in (fpaths.rglob(f"*{register}_*.bin") )]
+            return read_path[0]
