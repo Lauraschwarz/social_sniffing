@@ -40,7 +40,7 @@ for i, t in enumerate(trial):
     #plot_sniff_deltaF(sniff_resampled, delta_f_resampled)
 
     track = t.track
-    frame_datetimes = t.start + pd.to_timedelta(track.ds.time, unit='s')
+    frame_datetimes = t.start + pd.to_timedelta(track.ds.time, unit='s') ###FIXME this is introducing a shift in the time
     sniff_aligned = sniff.reindex(frame_datetimes, method='nearest')
     delta_f_aligned = delta_f.reindex(frame_datetimes, method='nearest')
     track.ds = track.ds.assign_coords(sniff=sniff_aligned.values)

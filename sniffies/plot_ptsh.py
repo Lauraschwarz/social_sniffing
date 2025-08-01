@@ -19,8 +19,8 @@ cmp = sns.diverging_palette(220, 20, as_cmap=True)
 
 
 session = session.Session(
-    mouse_id='1125135',
-    session_path=r'F:\social_sniffing\derivatives\1125132\2025-07-02T14-37-53')
+    mouse_id='1125131',
+    session_path=r'F:\social_sniffing\derivatives\1125131\2025-07-01T12-47-28')
 starts, ends = session.get_trial_onsets()
 trial = session.trials
 sniff = trial[0].sniffing.analogdataraw
@@ -183,9 +183,9 @@ def plot_single_event(onset, signal, threshold=150):
     correct_year = signal.index[0].year
     snout_distance.index = snout_distance.index.map(lambda ts: ts.replace(year=correct_year))
     snout_distance = snout_distance[~snout_distance.index.duplicated(keep='first')]
-    nearest_idx = snout_distance.index.get_indexer([onset], method='nearest')[0]
-    window_start = pd.to_datetime(nearest_idx, unit='s') - pd.Timedelta(seconds=window_pre)
-    window_end = pd.to_datetime(nearest_idx, unit='s') + pd.Timedelta(seconds=window_post)
+    nearest_idx = snout_distance.index.get_indexer([onset], method='nearest')
+    window_start = nearest_idx - pd.Timedelta(seconds=window_pre)
+    window_end = nearest_idx + pd.Timedelta(seconds=window_post)
     snout_distance = snout_distance.loc[window_start:window_end]
     
 

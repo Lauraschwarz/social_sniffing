@@ -93,7 +93,7 @@ for batch_start in range(0, num_trials, batch_size):
     
         
         track = t.track
-        frame_datetimes = trial[0].start + pd.to_timedelta(track.ds.time, unit='s')
+        frame_datetimes = t.track.start + pd.to_timedelta(track.ds.time, unit='s')
         #sniff_aligned = sniff.reindex(frame_datetimes, method='nearest')
         delta_f = delta_f.sort_index()
         delta_f.index = pd.to_datetime(delta_f.index)
@@ -164,5 +164,5 @@ for batch_start in range(0, num_trials, batch_size):
             suppress_colorbar=suppress_colorbar,
         )
     plt.title(f"Batch {batch_start} to {batch_end - 1} - Trials {batch_start + 1} to {batch_end}")
-    plt.savefig(pathlib.Path(session.session_path) / 'plots' / f"trial_batch_{batch_start}_{batch_end}_10secs.png", dpi=300)
+    #plt.savefig(pathlib.Path(session.session_path) / 'plots' / f"trial_batch_{batch_start}_{batch_end}_10secs.png", dpi=300)
     plt.tight_layout()
