@@ -3,14 +3,15 @@ import pandas as pd
 import harp as hp
 import constants
 import pathlib
-from scipy.signal import find_peaks, savgol_filter, butter, sosfilt, sosfiltfilt
+from movement.filtering import filter_by_confidence, interpolate_over_time, savgol_filter
+
 import matplotlib.pyplot as plt
 
 
     
 def get_harp_paths(path, register):
     fpaths = pathlib.Path(path)
-    read_path = [path for path in (fpaths.rglob(f"*_{register}_*.bin") )]
+    read_path = [path for path in (fpaths.rglob(f"*_{register}*.bin") )]
     if len(read_path) == 2:
         joined_path = join_binary_files(read_path[0], read_path[1])
         return joined_path
@@ -21,7 +22,7 @@ def get_harp_paths(path, register):
             return joined_files[0]
     elif len(read_path) == 1:
         return read_path[0]
-    elif len(read_path) is None:
+    elif len(read_path) == 0:
         raise FileNotFoundError(f"No harp data found for register {register} in {path}.")
       
 def join_binary_files(fpath1, fpath2):
@@ -36,3 +37,23 @@ def join_binary_files(fpath1, fpath2):
                 with open(f, 'rb') as infile:
                     outfile.write(infile.read())
         return out_path
+    
+def filter_positions(ds, confidence_threshold=0.39):
+        ds.update({
+                "position": filter_by_confidence(
+                ds.position, ds.confidence, threshold=confidence_threshold,print_report=True)})
+        ds.update({
+                "position": interpolate_over_time(ds.position, max_gap=50, print_report=True)})
+        ds.update(
+                {"position": savgol_filter(ds.position, 12)}
+)
+        return ds
+
+def get_barrier_open_time(fpath):
+        reader = hp.create_reader(constants.STEPMOTOR, epoch=hp.REFERENCE_EPOCH)
+        fpath = pathlib.Path(fpath) / 'StepMotor'
+        read_path = get_harp_paths(fpath, '81')
+        if not read_path:
+            raise FileNotFoundError("StepMotor file not found.")
+        motor_move = reader.Motor0MoveRelative.read(read_path)
+        return motor_move['Motor0MoveRelative'].index

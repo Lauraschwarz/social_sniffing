@@ -8,7 +8,7 @@ import numpy as np
 from datetime import datetime
 
 from cached_property import cached_property
-
+import pandas as pd
 import harp as hp
 import Sniff
 import trial
@@ -102,7 +102,6 @@ class Session(object):
         :return:
         """
         reader = hp.create_reader(r'F:/social_sniffing', epoch=hp.REFERENCE_EPOCH)
-
         output_set = reader.OutputSet.read(get_harp_paths(pathlib.Path(self.rawdata_path) / 'behav', register='34'))
         port0 = output_set["DOPort0"]
         trial_onsets = (port0[port0 == True].index)
@@ -139,7 +138,8 @@ class Session(object):
                             self,
                             session_path=self.session_path,
                             onset=onset,
-                            trial_end=trial_ends[i],
+                            trial_end=onset + pd.Timedelta(seconds=10),  # Assuming a default duration of 10 
+                            #seconds if whole trial duration is wanted : trial_end = trial_ends[i]                            
                             stimulus_type="conspecific",
                         )
                     
@@ -152,12 +152,7 @@ class Session(object):
         else:
             return ValueError("No trials found")
    
-    def photometry(self):
-        """
-        Returns the photometry data for the session.
-        :return: A DataFrame with the photometry data.
-        """
-        path = self.rawdata_path / "photo"
+
 
 
     

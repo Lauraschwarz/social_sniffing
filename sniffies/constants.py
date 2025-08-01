@@ -2,11 +2,11 @@
 #center and ports also have a correxponding center point.
 #the center point is used to calculate the distance to the ports.
 ARENA = {'center_roi': ((1245, 585), (1245, 475), (1330, 480), (1330, 580)), 
-            'port0_roi': ((400, 500), (400, 600), (500, 600), (500, 500)), 
-            'port1_roi': ((400, 0), (400, 100), (500, 100), (500, 0)), 
+            'port0': ((400, 500), (400, 600), (500, 600), (500, 500)), 
+            'port1': ((400, 0), (400, 100), (500, 100), (500, 0)), 
             'center':(1245, 580),
-            'port0':(1245, 580), 
-            'port1':(1330, 580),}
+            'Arena': ((100, 310), (275, 10), (450, 10), (625, 10), (800, 310), (625, 620), (450, 620), (275, 620)),
+            }
 
 ARENA_VERTICES = (
             (100, 310),
@@ -33,3 +33,6 @@ TRIAL_LENGTH = 60  # seconds##
 
 DEVICE = r'F:/social_sniffing'
 OUTPUT_EXPANDER = r'F:/social_sniffing/output_expander'
+STEPMOTOR = r'F:/social_sniffing/stepmotor'
+
+        #command_inf = f"sleap-track -m C:\\Users\\Laura\\PycharmProjects\\sleap\\models\\new_tracks_lesions240708_162312.centroid.n=1201  -m C:\\Users\\Laura\\PycharmProjects\\sleap\\models\\new_tracks_lesions240708_170141.multi_class_topdown.n=1201  -o {dest_path}  --tracking.tracker none {fpath}  "

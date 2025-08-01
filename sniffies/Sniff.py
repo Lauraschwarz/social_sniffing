@@ -51,8 +51,8 @@ class harp_data(object):
          
       
       def get_harp_paths(self, register):
-            fpaths = pathlib.Path(self.rawdata_path) 
-            read_path = [path for path in (fpaths.rglob(f"behav_*_{register}_*.bin") )]
+            fpaths = pathlib.Path(self.rawdata_path) / "behav"
+            read_path = [path for path in (fpaths.rglob(f"*_{register}_*.bin") )]
             if len(read_path) == 2:
                joined_path = self.join_binary_files(read_path[0], read_path[1])
                return joined_path

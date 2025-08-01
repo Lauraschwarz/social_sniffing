@@ -79,15 +79,15 @@ class Track(object):
         :param track: The x and y coordinates of the mouse.
         :return: A np.array with the distances to the reward ports.ranging from 0 to 1.
         """
-        port0 = PolygonOfInterest(ARENA['port0_roi'], name='port0')
-        port1 = PolygonOfInterest(ARENA['port1_roi'], name='port1')
+        port0 = PolygonOfInterest(ARENA['port0'], name='port0')
+        port1 = PolygonOfInterest(ARENA['port1'], name='port1')
 
         distance_port0 = port0.compute_distance_to(positions)
         distance_port1 = port1.compute_distance_to(positions)
 
         return distance_port0, distance_port1
     
-    def isin_ROI(self, positions):
+    def get_distance_from_wall(self, positions):
         """
         Check if the mouse is in the reward ports ROI. 
         :param track: The x and y coordinates of the mouse.
@@ -150,7 +150,6 @@ class Track(object):
         it takes the first track that enters the ROI you determine when the rewad is collected
         :param positions: The x and y coordinates of the mouse.
         :param roi_name: The name of the ROI to check (e.g., 'port0' or 'port1'). """    
-        roi = PolygonOfInterest(ARENA[roi_name], name=roi_name)
         start, valve_open = harp_data.filter_reward_window(self.start, roi_name)
         start = frame_index(start)
         valve_open_frame = frame_index(valve_open)

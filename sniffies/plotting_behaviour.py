@@ -19,6 +19,44 @@ signal, background = photo.clip_photometry()
 #video_start = trial[0].track.timestamps[0]
 num_trials = len(trial)
 
+for i, t in enumerate(trial):
+    fig, ax = plt.subplots(figsize=(10, 3))
+    start_time = pd.Timestamp(t.start).time()
+    end_time = t.end.time()
+    delta_f = deltaF.between_time(start_time, end_time)
+
+    sniff = t.sniffing.extract_sniff_freq()
+    common_time = pd.date_range(start=sniff.index.min(), end=sniff.index.max(), freq='100ms')
+
+    sniff_resampled = sniff.reindex(common_time, method='nearest')
+    delta_f_resampled = delta_f.reindex(common_time, method='nearest')
+    
+    raw_sniff = t.sniffing.analog 
+    poke0 = t.sniffing.get_pokes('DIPort0')
+    poke1 = t.sniffing.get_pokes('DIPort1')
+    valve0 = t.sniffing.get_valve_open('SupplyPort0')
+    valve1 = t.sniffing.get_valve_open('SupplyPort1')
+
+    #plot_sniff_deltaF(sniff_resampled, delta_f_resampled)
+
+    track = t.track
+    frame_datetimes = t.start + pd.to_timedelta(track.ds.time, unit='s')
+    sniff_aligned = sniff.reindex(frame_datetimes, method='nearest')
+    delta_f_aligned = delta_f.reindex(frame_datetimes, method='nearest')
+    track.ds = track.ds.assign_coords(sniff=sniff_aligned.values)
+    track.ds = track.ds.assign_coords(delta_f=delta_f_aligned.values)
+    distance = track.individual_distances()
+    snout_distance = distance.sel(**{'1': 'abdomen', '2': 'abdomen'})
+    port0_distance, port1_distance = track.distance_to_port(track.ds.position)
+    port0_distance = port0_distance.sel(individuals='2', keypoints='abdomen')
+    port1_distance = port1_distance.sel(individuals='2', keypoints='abdomen')
+    distance_from_wall = track.isin_ROI(track.ds.position)
+    distance_from_wall = distance_from_wall.sel(individuals='2', keypoints='abdomen')
+    abdomen_position = track.ds.position.sel(individuals='2', keypoints='abdomen')
+    distance_color_delta_F(abdomen_position, delta_f)
+
+    #plot_distance_deltaF(i, t, snout_distance, delta_f, valve0, valve1)
+
 def plot_sniff_deltaF(sniff_resampled, delta_f_resampled):
     sniff_resampled, delta_f_resampled = sniff_resampled.align(delta_f_resampled, join='inner')
 
@@ -110,41 +148,3 @@ def plot_distance_deltaF(i, t, snout_distance, delta_f, valve0, valve1):
     plt.tight_layout()
     plt.savefig(pathlib.Path(session.session_path) / 'plots' / f'trial_{i+1}_sniff_plot.png')
     return
-
-for i, t in enumerate(trial):
-    fig, ax = plt.subplots(figsize=(10, 3))
-    start_time = pd.Timestamp(t.start).time()
-    end_time = t.end.time()
-    delta_f = deltaF.between_time(start_time, end_time)
-
-    sniff = t.sniffing.extract_sniff_freq()
-    common_time = pd.date_range(start=sniff.index.min(), end=sniff.index.max(), freq='100ms')
-
-    sniff_resampled = sniff.reindex(common_time, method='nearest')
-    delta_f_resampled = delta_f.reindex(common_time, method='nearest')
-    
-    raw_sniff = t.sniffing.analog 
-    poke0 = t.sniffing.get_pokes('DIPort0')
-    poke1 = t.sniffing.get_pokes('DIPort1')
-    valve0 = t.sniffing.get_valve_open('SupplyPort0')
-    valve1 = t.sniffing.get_valve_open('SupplyPort1')
-
-    #plot_sniff_deltaF(sniff_resampled, delta_f_resampled)
-
-
-    track = t.track
-    frame_datetimes = t.start + pd.to_timedelta(track.ds.time, unit='s')
-    sniff_aligned = sniff.reindex(frame_datetimes, method='nearest')
-    track.ds = track.ds.assign_coords(sniff=sniff_aligned.values)
-    distance = track.individual_distances()
-    snout_distance = distance.sel(**{'1': 'abdomen', '2': 'abdomen'})
-    port0_distance, port1_distance = track.distance_to_port(track.ds.position)
-    port0_distance = port0_distance.sel(individuals='2', keypoints='abdomen')
-    port1_distance = port1_distance.sel(individuals='2', keypoints='abdomen')
-    distance_from_wall = track.isin_ROI(track.ds.position)
-    distance_from_wall = distance_from_wall.sel(individuals='2', keypoints='abdomen')
-    abdomen_position = track.ds.position.sel(individuals='2', keypoints='abdomen')
-    distance_color_delta_F(abdomen_position, delta_f)
-
-    #plot_distance_deltaF(i, t, snout_distance, delta_f, valve0, valve1)
-
